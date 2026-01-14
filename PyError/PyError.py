@@ -19,6 +19,12 @@ class PyError:
         self.extract_argumaent_info(exception)
         self.assign_error_code()
 
+    def Parse(msg, *args):
+        for arg in args:
+            if arg in msg:
+                return True
+        return False
+
     def CaptureIndex(self, i):
         self.i = i
 
@@ -28,42 +34,45 @@ class PyError:
     def CaptureGivenArgs(self, *args):
         self.gArgs = args
 
-    def Parse(msg, *args):
-        for arg in args:
-            if arg in msg:
-                return True
-        return False
+    def CheckArgs(self, msg):
+        
+        if self.Parse(msg, "were given", "positional arguments but"):
+            extra = len(self.gArgs) - len(self.rArgs)
+            incorrect = []
+            for i in range( 0, len(self.rArgs) ): 
+                if self.gArgs[i] != self.rArgs[i]: 
+                    incorrect.append(type(self.gArgs[i]))
+            errMSG = f"Too Many Arguments. Extra Functions Count: {extra} == The Argumaents: {incorrect}"
+            self.ErrorMessage(errMSG)
+            return
+
+        if self.Parse(msg, "missing 1 required positional argument", "missing {n} required positional arguments", "required positional argument"):
+            missing = len(self.rArgs) - len(self.gArgs)
+            incorrect = []
+            for i in range(len(self.rArgs) - missing, len(self.rArgs)):
+                if i < len(self.rArgs):
+                    incorrect.append(type(self.rArgs[i]))
+            errMSG = f"Too Many Arguments. Missing Functions Count: {missing} == The Arguments: {incorrect}"
+            self.ErrorMessage(errMSG)
+            return
+
+        if self.Parse(msg, "unexpected keyword argument", "got an unexpected keyword argument"):
+            incorrect = []
+            for i in range(0, len(self.gArgs)): 
+                if type(self.gArgs[i]) != type(self.rArgs[i]): 
+                    incorrect.append(self.gArgs[i])
+            errMSG = f"Incorrect Arguments. The Arguments: {incorrect}"
+            self.ErrorMessage(errMSG)
+            return
+
+
 
     def CheckIndex(self, msg):
         if self.Parse(msg, "list index out of range", "tuple index out of range"):
             if self.rI > self.i:
                 errorIndex = self.rI - self.i
                 errMSG = f"Index Out Of Range by {errorIndex}"
-                self.ErrorMessage()
-    
-    def CheckArgs(self, msg):
-        
-        if self.Parse(msg, "were given", "positional arguments but"):
-            extra = len(self.gArgs) - len(self.rArgs)
-            incorrect = []
-            for i in range(min(len(self.gArgs), len(self.rArgs))): 
-                if self.gArgs[i] != self.rArgs[i]: 
-                    incorrect.append(self.gArgs[i])
-            errMSG = f"Too Many Argumaents. Extra Functions Count: {extra} == The Argumaents: {incorrect}"
-            self.ErrorMessage()
-        
-        elif self.Parse(msg, "missing 1 required positional argument", "missing {n} required positional arguments", "required positional argument"):
-            incorrect = []
-            for i in range(len(self.gArgs), len(self.rArgs)):
-                if i > len(self.gArgs):
-                    incorrect.append(self.rArgs[i])
-
-        elif self.Parse(msg, "unexpected keyword argument", "got an unexpected keyword argument"):
-                        incorrect = []
-                        for i in range(min(len(self.gArgs), len(self.rArgs))): 
-                            if self.gArgs[i] != self.rArgs[i]: 
-                                incorrect.append(self.gArgs[i])
-
+                self.ErrorMessage
 
     def ErrorMessage(self, message):
         trace = self.exception.__traceback__
