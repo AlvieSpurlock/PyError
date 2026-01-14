@@ -1,6 +1,8 @@
+from email import message
 import PyConsole as con
 from datetime import datetime as dt
 from os import path
+import sys
 
 class PyError:
     def __init__(self, exception, rI = 0):
@@ -19,11 +21,44 @@ class PyError:
         self.extract_argumaent_info(exception)
         self.assign_error_code()
 
-    def Parse(msg, *args):
+
+    def ErrorMessage(self, message):
+            trace = self.exception.__traceback__
+            while trace.tb_next:
+                trace = trace.tb_next
+            self.file = trace.tb_frame.f_code.co_filename
+            self.line = trace.tb_lineno
+            self.method = trace.tb_frame.f_code.co_name
+            readableTime = self.date_time.strftime("%B %d, %Y at %I:%M %p")
+
+
+            filePath = f"\nFile Path of Error: \n{path.realpath(self.file)}\n------"
+            method = f"\nMethod In Question: {self.method}"
+            line = f"Line In Question{self.line}\n------"
+            time = f"\nTime Of Error: {readableTime}"
+            con.PrintHeader(message)
+
+            self.msg = f"{filePath}{method}{line}{time}\n\n[======================]\n\n"
+            print(self.msg)
+
+            errLog = open("ErrorLog.txt", "w+")
+            errLog.write(f"{self.msg}")
+            errLog.close()
+
+    def Parse(self, msg, *args):
         for arg in args:
             if arg in msg:
                 return True
         return False
+
+
+
+    @staticmethod 
+    def register_global_hook(): 
+        def global_error_hook(exc_type, exc, tb): 
+            PyError(exc) 
+        sys.excepthook = global_error_hook
+
 
     def CaptureIndex(self, i):
         self.i = i
@@ -34,9 +69,11 @@ class PyError:
     def CaptureGivenArgs(self, *args):
         self.gArgs = args
 
+
+
     def CheckArgs(self, msg):
         
-        if self.Parse(msg, "were given", "positional arguments but"):
+        if self.Parse(msg,"got multiple values for argument","got an unexpected keyword argument", "were given", "positional arguments but"):
             extra = len(self.gArgs) - len(self.rArgs)
             incorrect = []
             for i in range( 0, len(self.rArgs) ): 
@@ -46,7 +83,7 @@ class PyError:
             self.ErrorMessage(errMSG)
             return
 
-        if self.Parse(msg, "missing 1 required positional argument", "missing {n} required positional arguments", "required positional argument"):
+        if self.Parse(msg,"missing 1 required keyword-only argument","required keyword-only argument", "missing 1 required positional argument", "missing {n} required positional arguments", "required positional argument"):
             missing = len(self.rArgs) - len(self.gArgs)
             incorrect = []
             for i in range(len(self.rArgs) - missing, len(self.rArgs)):
@@ -56,7 +93,7 @@ class PyError:
             self.ErrorMessage(errMSG)
             return
 
-        if self.Parse(msg, "unexpected keyword argument", "got an unexpected keyword argument"):
+        if self.Parse(msg,"not supported between instances of","expected","must be","unsupported operand type(s) for", "unexpected keyword argument", "got an unexpected keyword argument"):
             incorrect = []
             for i in range(0, len(self.gArgs)): 
                 if type(self.gArgs[i]) != type(self.rArgs[i]): 
@@ -65,34 +102,74 @@ class PyError:
             self.ErrorMessage(errMSG)
             return
 
-
-
     def CheckIndex(self, msg):
         if self.Parse(msg, "list index out of range", "tuple index out of range"):
             if self.rI > self.i:
                 errorIndex = self.rI - self.i
                 errMSG = f"Index Out Of Range by {errorIndex}"
-                self.ErrorMessage
+                self.ErrorMessage(errMSG)
 
-    def ErrorMessage(self, message):
-        trace = self.exception.__traceback__
-        while trace.tb_next:
-            trace = trace.tb_next
-        self.file = trace.tb_frame.f_code.co_filename
-        self.line = trace.tb_lineno
-        self.method = trace.tb_frame.f_code.co_name
-        readableTime = self.date_time.strftime("%B %d, %Y at %I:%M %p")
+    def CheckFileIO(self, msg):
+        if self.Parse(msg, "No such file or directory"):
+            errMSG = f"That is not a File or Directory"
+            self.ErrorMessage(errMSG)
+        elif self.Parse(msg, "Permission denied"):
+            errMSG = f"Permission denied to File or Directory"
+            self.ErrorMessage(errMSG)
+        elif self.Parse(msg, "Not a directory"):
+            errMSG = f"NOT a Directory"
+            self.ErrorMessage(errMSG)
+        else:
+            errMSG = f"Unrecognized File I/O Error"
+            self.ErrorMessage(errMSG)
+
+    def CheckMath(self, msg):
+        if self.Parse(msg, "division by zero", "integer division or modulo by zero"):
+            errMSG = f"Division by Zero"
+            self.ErrorMessage(errMSG)
 
 
-        filePath = f"\nFile Path of Error: \n{path.realpath(self.file)}\n------"
-        method = f"\nMethod In Question: {self.method}"
-        line = f"Line In Question{self.line}\n------"
-        time = f"\nTime Of Error: {readableTime}"
-        con.PrintHeader(message)
+    def CheckValue(self, msg):
+        if self.Parse(msg, "has no attribute"):
+            errMSG = "No Attribute Exists"
+            self.ErrorMessage(errMSG)
+            return
 
-        self.msg = f"{filePath}{method}{line}{time}\n\n[======================]\n\n"
-        print(self.msg)
 
-        errLog = open("ErrorLog.txt", "w+")
-        errLog.write(f"{self.msg}")
-        errLog.close()
+        if self.Parse(msg, "KeyError"):
+            errMSG = "No Key Exists"
+            self.ErrorMessage(errMSG)
+            return
+
+
+        if self.Parse(msg,
+                      "invalid literal for int() with base",
+                      "not enough values to unpack",
+                      "too many values to unpack"):
+            errMSG = "Incorrect or Invalid Value"
+            self.ErrorMessage(errMSG)
+            return
+
+
+        incorrect = []
+        for i in range(min(len(self.gArgs), len(self.rArgs))):
+            if type(self.gArgs[i]) != type(self.rArgs[i]):
+                incorrect.append(self.gArgs[i])
+
+        if incorrect:
+            errMSG = f"Incorrect Values: {incorrect}"
+            self.ErrorMessage(errMSG)
+            return
+
+    def assign_error_code(self):
+        msg = str(self.exception)
+
+        self.CheckArgs(msg)
+
+        self.CheckIndex(msg)
+
+        self.CheckFileIO(msg)
+
+        self.CheckMath(msg)
+
+        self.CheckValue(msg)
