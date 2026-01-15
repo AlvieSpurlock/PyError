@@ -71,6 +71,8 @@ class PyError:
 
         self.CheckValue(msg)
 
+        self.CheckImport(msg)
+
     @staticmethod 
     def register_global_hook(): 
         def global_error_hook(exc_type, exc, tb): 
@@ -111,6 +113,11 @@ class PyError:
                 errLog.write(f"{self.msg}")
                 errLog.close()
 
+    def CheckImport(self, msg):
+        if self.Parse(msg, "No module named", "cannot import name"):
+            errMSG = "Import Error: Module or name not found"
+            self.ErrorMessage(errMSG)
+            return
 
     def CheckArgs(self, msg):
         
