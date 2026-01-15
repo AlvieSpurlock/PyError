@@ -3,8 +3,16 @@ import PyConsole as con
 from datetime import datetime as dt
 from os import path
 import sys
+import inspect
+
+class PyErrorMeta:
+    def __init__(self):
+        self.i = None
+        self.rArgs = []
+        self.gArgs = []
 
 class PyError:
+    active = None
     def __init__(self, exception, rI = 0):
         self.exception = exception
         self.message = None
@@ -18,40 +26,50 @@ class PyError:
         self.line = None
         self.method = None
         self.extract_traceback(exception)
-        self.extract_argumaent_info(exception)
+        self.extract_argument_info(exception)
         self.assign_error_code()
 
+    def BindMetadeta(self, i, function, *args, **kwargs):
+        sig = inspect.signature(function)
+        required = [ p.annotation if p.annotation != inspect._empty 
+                    else p.name
+                    for p in sig.parameters.values() ]
+        PyError.active = PyErrorMeta()
+        PyError.active.i = i
+        PyError.active.rArgs = required
+        PyError.active.gArgs = list(args) + list(kwargs.values())
 
-    def ErrorMessage(self, message):
-            trace = self.exception.__traceback__
-            while trace.tb_next:
-                trace = trace.tb_next
-            self.file = trace.tb_frame.f_code.co_filename
-            self.line = trace.tb_lineno
-            self.method = trace.tb_frame.f_code.co_name
-            readableTime = self.date_time.strftime("%B %d, %Y at %I:%M %p")
+    def extract_traceback(self, exception):
+        trace = exception.__traceback__
+        while trace.tb_next:
+            trace = trace.tb_next
 
+        self.file = trace.tb_frame.f_code.co_filename
+        self.line = trace.tb_lineno
+        self.method = trace.tb_frame.f_code.co_name
 
-            filePath = f"\nFile Path of Error: \n{path.realpath(self.file)}\n------"
-            method = f"\nMethod In Question: {self.method}"
-            line = f"Line In Question{self.line}\n------"
-            time = f"\nTime Of Error: {readableTime}"
-            con.PrintHeader(message)
+    def extract_argument_info(self, exception):
+        try:
+            msg = str(exception)
+            if PyError.active:
+                self.i = PyError.active.i
+                self.rArgs = PyError.active.rArgs
+                self.gArgs = PyError.active.gArgs
+        except Exception:
+            pass
 
-            self.msg = f"{filePath}{method}{line}{time}\n\n[======================]\n\n"
-            print(self.msg)
+    def assign_error_code(self):
+        msg = str(self.exception)
 
-            errLog = open("ErrorLog.txt", "w+")
-            errLog.write(f"{self.msg}")
-            errLog.close()
+        self.CheckArgs(msg)
 
-    def Parse(self, msg, *args):
-        for arg in args:
-            if arg in msg:
-                return True
-        return False
+        self.CheckIndex(msg)
 
+        self.CheckFileIO(msg)
 
+        self.CheckMath(msg)
+
+        self.CheckValue(msg)
 
     @staticmethod 
     def register_global_hook(): 
@@ -69,6 +87,29 @@ class PyError:
     def CaptureGivenArgs(self, *args):
         self.gArgs = args
 
+
+    def Parse(self, msg, *args):
+        for arg in args:
+            if arg in msg:
+                return True
+        return False
+
+    def ErrorMessage(self, message):
+                readableTime = self.date_time.strftime("%B %d, %Y at %I:%M %p")
+
+
+                filePath = f"\nFile Path of Error: \n{path.realpath(self.file)}\n------"
+                method = f"\nMethod In Question: {self.method}"
+                line = f"Line In Question{self.line}\n------"
+                time = f"\nTime Of Error: {readableTime}"
+                con.PrintHeader(message)
+
+                self.msg = f"{filePath}{method}{line}{time}\n\n[======================]\n\n"
+                print(self.msg)
+
+                errLog = open("ErrorLog.txt", "w+")
+                errLog.write(f"{self.msg}")
+                errLog.close()
 
 
     def CheckArgs(self, msg):
@@ -160,16 +201,3 @@ class PyError:
             errMSG = f"Incorrect Values: {incorrect}"
             self.ErrorMessage(errMSG)
             return
-
-    def assign_error_code(self):
-        msg = str(self.exception)
-
-        self.CheckArgs(msg)
-
-        self.CheckIndex(msg)
-
-        self.CheckFileIO(msg)
-
-        self.CheckMath(msg)
-
-        self.CheckValue(msg)
